@@ -32,6 +32,7 @@ class PostgresCredentials(Credentials):
     sslcert: Optional[str] = None
     sslkey: Optional[str] = None
     sslrootcert: Optional[str] = None
+    statement_timeout: Optional[str] = None
     application_name: Optional[str] = "dbt"
     retries: int = 1
 
@@ -60,6 +61,7 @@ class PostgresCredentials(Credentials):
             "sslcert",
             "sslkey",
             "sslrootcert",
+            "statement_timeout",
             "application_name",
             "retries",
         )
@@ -109,12 +111,17 @@ class PostgresConnectionManager(SQLConnectionManager):
         if credentials.keepalives_idle:
             kwargs["keepalives_idle"] = credentials.keepalives_idle
 
-        # psycopg2 doesn't support search_path officially,
         # see https://github.com/psycopg/psycopg2/issues/465
-        search_path = credentials.search_path
-        if search_path is not None and search_path != "":
-            # see https://postgresql.org/docs/9.5/libpq-connect.html
-            kwargs["options"] = "-c search_path={}".format(search_path.replace(" ", "\\ "))
+        options = {}
+
+        if credentials.search_path is not None and search_path != "":
+            options["search_path"] = credentials.search_path
+
+        if credentials.statement_timeout is not None:
+            options["statement_timeout"] = credentials.statement_timeout
+
+        if options:
+            kwargs["options"] = "-c " + " ".join(f'{k}={v}' for k, v in options.items())
 
         if credentials.sslmode:
             kwargs["sslmode"] = credentials.sslmode

@@ -32,7 +32,10 @@ class PostgresCredentials(Credentials):
     sslcert: Optional[str] = None
     sslkey: Optional[str] = None
     sslrootcert: Optional[str] = None
-    statement_timeout: Optional[str] = None
+    statement_timeout: Optional[int] = None
+    lock_timeout: Optional[int] = None
+    default_transaction_isolation: Optional[str] = None
+    default_transaction_read_only: Optional[str] = None
     application_name: Optional[str] = "dbt"
     retries: int = 1
 
@@ -62,6 +65,9 @@ class PostgresCredentials(Credentials):
             "sslkey",
             "sslrootcert",
             "statement_timeout",
+            "lock_timeout",
+            "default_transaction_isolation",
+            "default_transaction_read_only",
             "application_name",
             "retries",
         )
@@ -69,6 +75,14 @@ class PostgresCredentials(Credentials):
 
 class PostgresConnectionManager(SQLConnectionManager):
     TYPE = "postgres"
+
+    _CONNECTION_OPTIONS = [
+        "search_path",
+        "statement_timeout",
+        "lock_timeout",
+        "default_transaction_isolation",
+        "default_transaction_read_only"
+    ]
 
     @contextmanager
     def exception_handler(self, sql):
@@ -114,12 +128,13 @@ class PostgresConnectionManager(SQLConnectionManager):
         # see https://github.com/psycopg/psycopg2/issues/465
         options = {}
 
-        if credentials.search_path is not None and search_path != "":
-            options["search_path"] = credentials.search_path
+        # Check for custom options.
+        for param in PostgresConnectionManager._CONNECTION_OPTIONS:
+            value = getattr(credentials, param)
+            if str(value) is not None:
+                options[param] = value
 
-        if credentials.statement_timeout is not None:
-            options["statement_timeout"] = credentials.statement_timeout
-
+        # Specify list of key-value pairs on the command-line.
         if options:
             kwargs["options"] = "-c " + " ".join(f'{k}={v}' for k, v in options.items())
 

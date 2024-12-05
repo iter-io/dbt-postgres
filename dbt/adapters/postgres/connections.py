@@ -26,6 +26,7 @@ class PostgresCredentials(Credentials):
     password: str  # on postgres the password is mandatory
     connect_timeout: int = 10
     role: Optional[str] = None
+    autocommit: Optional[bool] = False
     search_path: Optional[str] = None
     keepalives_idle: int = 0  # 0 means to use the default value
     sslmode: Optional[str] = None
@@ -58,6 +59,7 @@ class PostgresCredentials(Credentials):
             "schema",
             "connect_timeout",
             "role",
+            "autocommit",
             "search_path",
             "keepalives_idle",
             "sslmode",
@@ -163,6 +165,8 @@ class PostgresConnectionManager(SQLConnectionManager):
                 connect_timeout=credentials.connect_timeout,
                 **kwargs,
             )
+            if credentials.autocommit:
+                handle.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
             if credentials.role:
                 handle.cursor().execute("set role {}".format(credentials.role))
             return handle
